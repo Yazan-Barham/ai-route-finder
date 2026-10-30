@@ -1,26 +1,142 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>AI Route Finder</title>
+  <meta name="theme-color" content="#234c40">
+  <title>Pathwise · AI Route Finder</title>
   <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
-  <header><h1>AI Route Finder</h1></header>
-  <main>
-    <section class="panel">
-      <label for="start">Start city</label><select id="start"></select>
-      <label for="goal">Goal city</label><select id="goal"></select>
-      <label for="algo">Algorithm</label><select id="algo"></select>
-      <button id="run">Find route</button>
-      <label for="file">Load a map (JSON)</label>
-      <input type="file" id="file" accept=".json,application/json">
-      <div id="msg" role="status"></div>
-      <div id="results"></div>
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="brand" href="#" aria-label="Pathwise home">
+        <span class="brand-mark" aria-hidden="true">↗</span>
+        <span>pathwise<span class="brand-dot">.</span></span>
+      </a>
+
+      <span class="header-label">AI ROUTE SEARCH</span>
+      <span class="assignment-tag">Assignment 01</span>
+    </div>
+  </header>
+
+  <main class="page-shell">
+    <section class="intro">
+      <div>
+        <p class="eyebrow">EXPLORE · SEARCH · COMPARE</p>
+        <h1>Find your best route.</h1>
+        <p class="intro-copy">
+          Choose two cities and let the search algorithm find a way.
+        </p>
+      </div>
+      <div class="local-note">
+        <span class="status-dot"></span>
+        Runs locally on your device
+      </div>
     </section>
-    <section><svg id="map" role="img" aria-label="Road map"></svg></section>
+
+    <div class="workspace">
+      <aside class="control-column">
+        <section class="panel journey-panel">
+          <div class="section-heading">
+            <div>
+              <p class="panel-kicker">YOUR JOURNEY</p>
+              <h2>Plan your route</h2>
+            </div>
+            <span class="section-number">01</span>
+          </div>
+
+          <div class="field">
+            <label for="start">START CITY</label>
+            <select id="start"></select>
+          </div>
+
+          <div class="field">
+            <label for="goal">DESTINATION</label>
+            <select id="goal"></select>
+          </div>
+
+          <div class="field">
+            <label for="algo">SEARCH ALGORITHM</label>
+            <select id="algo"></select>
+          </div>
+
+          <button id="run" class="button button-primary" type="button">
+            <span>Find route</span>
+            <span aria-hidden="true">→</span>
+          </button>
+
+          <p class="control-note">
+            Pick a starting point, destination, and search strategy.
+          </p>
+        </section>
+
+        <section class="panel upload-panel">
+          <div class="upload-icon" aria-hidden="true">↑</div>
+          <h2>Use your own map</h2>
+          <p>Upload a road network in JSON format.</p>
+          <label class="button button-upload" for="file">
+            Choose JSON file
+          </label>
+          <input
+            type="file"
+            id="file"
+            accept=".json,application/json"
+          >
+        </section>
+
+        <div id="msg" class="message" role="status" aria-live="polite"></div>
+      </aside>
+
+      <div class="visual-column">
+        <section class="panel map-panel">
+          <div class="map-header">
+            <div>
+              <p class="panel-kicker">ROAD NETWORK</p>
+              <h2>Explore the map</h2>
+            </div>
+            <span class="map-badge">
+              <span class="status-dot"></span>
+              Interactive map
+            </span>
+          </div>
+
+          <div class="map-canvas">
+            <svg id="map" role="img" aria-label="Road map"></svg>
+            <span class="map-caption">CITY CONNECTIONS</span>
+          </div>
+
+          <div class="map-legend">
+            <span><i class="legend-city"></i> City</span>
+            <span><i class="legend-road"></i> Road</span>
+            <span class="legend-note">Select a route to view its path</span>
+          </div>
+        </section>
+
+        <section class="panel results-panel">
+          <div class="results-heading">
+            <div>
+              <p class="panel-kicker">SEARCH RESULTS</p>
+              <h2>Your route details</h2>
+            </div>
+          </div>
+          <div id="results">
+            <p class="empty-state">
+              Choose your cities and select <strong>Find route</strong> to see
+              the result.
+            </p>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <footer class="page-footer">
+      <span>pathwise<span class="brand-dot">.</span> Route Search Lab</span>
+      <span>Built for AI Assignment 01</span>
+    </footer>
   </main>
+
   <script src="map-data.js"></script>
   <script src="graph.js"></script>
   <script src="algorithms.js"></script>
