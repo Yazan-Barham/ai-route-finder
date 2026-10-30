@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI Route Finder</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header><h1>AI Route Finder</h1></header>
+  <main>
+    <section class="panel">
+      <label for="start">Start city</label><select id="start"></select>
+      <label for="goal">Goal city</label><select id="goal"></select>
+      <label for="algo">Algorithm</label><select id="algo"></select>
+      <button id="run">Find route</button>
+      <label for="file">Load a map (JSON)</label>
+      <input type="file" id="file" accept=".json,application/json">
+      <div id="msg" role="status"></div>
+      <div id="results"></div>
+    </section>
+    <section><svg id="map" role="img" aria-label="Road map"></svg></section>
+  </main>
+  <script src="map-data.js"></script>
+  <script src="graph.js"></script>
+  <script src="algorithms.js"></script>
+  <script src="ui.js"></script>
+</body>
+</html>
