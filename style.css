@@ -396,8 +396,51 @@ label[for="file"]:focus-visible {
 
 #map {
   width: 100%;
+  height: auto;
   min-height: 420px;
   display: block;
+}
+
+#map .road {
+  stroke: #a8b6ac;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+#map .road.hot {
+  stroke: var(--green);
+  stroke-width: 5;
+}
+
+#map .city {
+  fill: var(--paper);
+  stroke: #426454;
+  stroke-width: 2;
+}
+
+#map .city.hot {
+  fill: var(--green);
+  stroke: var(--green);
+}
+
+#map .name,
+#map .km {
+  paint-order: stroke;
+  stroke: #f9faf5;
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+
+#map .name {
+  fill: var(--ink);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+#map .km {
+  fill: #4d6558;
+  font-size: 12px;
+  text-anchor: middle;
 }
 
 .map-caption {

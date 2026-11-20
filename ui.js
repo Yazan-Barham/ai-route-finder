@@ -1,106 +1,188 @@
-const $ = id => document.getElementById(id);
-const NS = 'http://www.w3.org/2000/svg';
-let graph = null, results = [];
+function drawMap(mapData, path = []) {
+  const svg = document.getElementById("map");
+  const width = 720;
+  const height = 520;
+  const paddingX = 100;
+  const paddingY = 45;
 
-function svgEl(tag, attrs, text) {
-  const e = document.createElementNS(NS, tag);
-  for (const k in attrs) e.setAttribute(k, attrs[k]);
-  if (text !== undefined) e.textContent = text;
-  return e;
-}
+  function makeSvg(tag, attributes = {}, text = "") {
+    const element = document.createElementNS("http://www.w3.org/2000/svg", tag);
 
-function say(text, isError) {
-  const m = $('msg');
-  m.textContent = text;
-  m.className = isError ? 'error' : '';
-}
+    for (const [name, value] of Object.entries(attributes)) {
+      element.setAttribute(name, String(value));
+    }
 
-function loadMap(data) {
-  const built = buildGraph(data);          // throws if the map is invalid
-  graph = built.graph;
-  for (const id of ['start', 'goal']) {
-    const sel = $(id);
-    sel.innerHTML = '';
-    Object.keys(graph.cities).forEach(n => sel.add(new Option(n, n)));
+    element.textContent = text;
+    return element;
   }
-  $('goal').selectedIndex = Object.keys(graph.cities).length - 1;
-  $('results').innerHTML = '';
-  results = [];
-  drawMap([]);
-  say(built.warnings.length ? built.warnings.join(' ') : 'Map loaded. Pick a start, a goal and an algorithm.');
-}
 
-function drawMap(path) {
-  const svg = $('map');
-  svg.innerHTML = '';
-  svg.setAttribute('viewBox', `0 0 ${graph.W} ${graph.H}`);
-  const onPath = new Set();
-  for (let i = 0; i < path.length - 1; i++) {
-    onPath.add(path[i] + '|' + path[i + 1]);
-    onPath.add(path[i + 1] + '|' + path[i]);
+  const xs = mapData.cities.map(city => city.x);
+  const ys = mapData.cities.map(city => city.y);
+  const minX = Math.min(...xs);
+  const maxY = Math.max(...ys);
+  const spanX = Math.max(...xs) - minX;
+  const spanY = maxY - Math.min(...ys);
+
+  const scale = Math.min(
+    (width - 2 * paddingX) / Math.max(spanX, 1),
+    (height - 2 * paddingY) / Math.max(spanY, 1)
+  );
+
+  const left = (width - spanX * scale) / 2;
+  const top = (height - spanY * scale) / 2;
+  const positions = new Map();
+
+  for (const { name, x, y } of mapData.cities) {
+    positions.set(name, {
+      x: left + (x - minX) * scale,
+      y: top + (maxY - y) * scale
+    });
   }
-  for (const r of graph.roads) {
-    const a = graph.pos[r.from], b = graph.pos[r.to];
-    const hot = onPath.has(r.from + '|' + r.to);
-    svg.append(svgEl('line', { x1: a.x, y1: a.y, x2: b.x, y2: b.y, class: hot ? 'road hot' : 'road' }));
-    svg.append(svgEl('text', { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 - 4, class: 'km' }, r.km));
+
+  // نفس مفتاح الطريق سواء اتجهنا من A إلى B أو من B إلى A.
+  const roadKey = (from, to) => JSON.stringify([from, to].sort());
+  const routeRoads = new Set();
+  const routeCities = new Set(path);
+
+  for (let i = 1; i < path.length; i++) {
+    routeRoads.add(roadKey(path[i - 1], path[i]));
   }
-  for (const n in graph.pos) {
-    const p = graph.pos[n];
-    const cls = path.includes(n) ? 'city hot' : 'city';
-    svg.append(svgEl('circle', { cx: p.x, cy: p.y, r: 7, class: cls }));
-    svg.append(svgEl('text', { x: p.x + 11, y: p.y + 4, class: 'name' }, n));
+
+  const roads = makeSvg("g");
+  const highlightedRoads = makeSvg("g");
+  const distances = makeSvg("g");
+  const cities = makeSvg("g");
+
+  for (const { from, to, km } of mapData.roads) {
+    const a = positions.get(from);
+    const b = positions.get(to);
+    const highlighted = routeRoads.has(roadKey(from, to));
+    const layer = highlighted ? highlightedRoads : roads;
+
+    layer.append(makeSvg("line", {
+      x1: a.x,
+      y1: a.y,
+      x2: b.x,
+      y2: b.y,
+      class: highlighted ? "road hot" : "road"
+    }));
+
+    distances.append(makeSvg("text", {
+      x: (a.x + b.x) / 2,
+      y: (a.y + b.y) / 2 - 5,
+      class: "km"
+    }, `${km} km`));
   }
+
+  for (const { name } of mapData.cities) {
+    const { x, y } = positions.get(name);
+
+    cities.append(
+      makeSvg("circle", {
+        cx: x,
+        cy: y,
+        r: 6,
+        class: routeCities.has(name) ? "city hot" : "city"
+      }),
+      makeSvg("text", {
+        x: x + 10,
+        y: y + 5,
+        class: "name"
+      }, name)
+    );
+  }
+
+  svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  svg.replaceChildren(roads, highlightedRoads, distances, cities);
 }
 
-function showResults() {
-  const box = $('results');
-  box.innerHTML = '';
-  const table = document.createElement('table');
-  table.innerHTML = '<tr><th>Algorithm</th><th>Path</th><th>Cost (km)</th><th>Steps</th><th>Expanded</th></tr>';
-  const costs = results.filter(r => r.res).map(r => r.res.cost);
-  const best = Math.min(...costs);
-  results.forEach((r, i) => {
-    const tr = document.createElement('tr');
-    const cells = r.res
-      ? [r.name, r.res.path.join(' → '), r.res.cost, r.res.steps, r.res.expanded]
-      : [r.name, 'No route found', '-', '-', '-'];
-    cells.forEach(c => { const td = document.createElement('td'); td.textContent = c; tr.append(td); });
-    if (r.res && r.res.cost === best && results.length > 1) tr.classList.add('best');
-    tr.onclick = () => select(i);
-    table.append(tr);
-  });
-  box.append(table);
-  select(0);
-}
+async function initRouteSearch() {
+  const startSelect = document.getElementById("start");
+  const goalSelect = document.getElementById("goal");
+  const algorithmSelect = document.getElementById("algo");
+  const runButton = document.getElementById("run");
+  const results = document.getElementById("results");
+  const message = document.getElementById("msg");
 
-function select(i) {
-  document.querySelectorAll('#results tr').forEach((tr, j) => tr.classList.toggle('active', j === i + 1));
-  drawMap(results[i].res ? results[i].res.path : []);
-}
-
-function run() {
-  const start = $('start').value, goal = $('goal').value, algo = $('algo').value;
-  if (start === goal) return say('Start and goal are the same city.', true);
-  const types = algo === 'all' ? Object.keys(ALGOS) : [algo];
-  results = types.map(t => ({ name: ALGOS[t], res: search(graph, start, goal, t) }));
-  say(results.every(r => !r.res) ? 'No route between these cities.' : 'Click a row to show its path on the map.');
-  showResults();
-}
-
-$('algo').innerHTML = Object.entries(ALGOS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')
-  + '<option value="all">Compare all</option>';
-$('run').onclick = run;
-$('file').onchange = e => {
-  const f = e.target.files[0];
-  if (!f) return;
-  const reader = new FileReader();
-  reader.onload = () => {
-    try { loadMap(JSON.parse(reader.result)); }
-    catch (err) { say('Could not load map: ' + err.message, true); }
+  const algorithms = {
+    bfs: { label: "Breadth-First Search (BFS)", search: bfs },
+    dfs: { label: "Depth-First Search (DFS)", search: dfs },
+    ucs: { label: "Uniform-Cost Search (UCS)", search: ucs },
+    greedy: { label: "Greedy Best-First", search: greedy },
+    astar: { label: "A* Search", search: astar }
   };
-  reader.readAsText(f);
-  e.target.value = '';
-};
 
-loadMap(DEFAULT_MAP);
+  runButton.disabled = true;
+  results.setAttribute("aria-live", "polite");
+
+  let mapData;
+  let graph;
+
+  try {
+    const response = await fetch("./sample-map.json");
+
+    if (!response.ok) {
+      throw new Error(`Unable to open sample-map.json (HTTP ${response.status}).`);
+    }
+
+    mapData = await response.json();
+    graph = buildGraph(mapData);
+    drawMap(mapData);
+  } catch (error) {
+    message.textContent = `Could not load the map. ${error.message}`;
+    message.classList.add("error");
+    return;
+  }
+
+  const cityNames = [...graph.cities.keys()].sort((a, b) =>
+    a.localeCompare(b, "en")
+  );
+
+  for (const select of [startSelect, goalSelect]) {
+    select.replaceChildren(...cityNames.map(name => new Option(name, name)));
+  }
+
+  algorithmSelect.replaceChildren(
+    ...Object.entries(algorithms).map(([id, algorithm]) =>
+      new Option(algorithm.label, id)
+    )
+  );
+
+  startSelect.value = "Jenin";
+  goalSelect.value = "Hebron";
+  algorithmSelect.value = "astar";
+
+  runButton.addEventListener("click", () => {
+    const algorithm = algorithms[algorithmSelect.value];
+    const { path, costKm, steps } = algorithm.search(
+      graph,
+      startSelect.value,
+      goalSelect.value
+    );
+
+    drawMap(mapData, path);
+
+    const lines = path.length > 0
+      ? [`Route: ${path.join(" → ")}`, `Total distance: ${costKm} km`]
+      : ["No route found between these cities."];
+
+    lines.push(`Search steps: ${steps}`);
+
+    results.replaceChildren(...lines.map(line => {
+      const paragraph = document.createElement("p");
+      paragraph.textContent = line;
+      return paragraph;
+    }));
+  });
+
+  for (const select of [startSelect, goalSelect, algorithmSelect]) {
+    select.addEventListener("change", () => {
+      results.replaceChildren();
+      drawMap(mapData);
+    });
+  }
+
+  runButton.disabled = false;
+}
+
+initRouteSearch();
