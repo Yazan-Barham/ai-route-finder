@@ -1,3 +1,45 @@
+function validateMapData(data) {
+  if (!Array.isArray(data?.cities) || data.cities.length === 0) {
+    throw new Error("The map must have at least one city.");
+  }
+
+  if (!Array.isArray(data.roads)) {
+    throw new Error("The map must have a roads array.");
+  }
+
+  if (data.unit !== undefined && data.unit !== "km") {
+    throw new Error('The map unit must be "km".');
+  }
+
+  const names = new Set();
+
+  for (const [index, city] of data.cities.entries()) {
+    if (typeof city?.name !== "string" || city.name.trim() === "") {
+      throw new Error(`City ${index + 1} needs a name.`);
+    }
+
+    if (names.has(city.name)) {
+      throw new Error(`Duplicate city name: ${city.name}.`);
+    }
+
+    if (!Number.isFinite(city.x) || !Number.isFinite(city.y)) {
+      throw new Error(`City "${city.name}" needs numeric x and y coordinates.`);
+    }
+
+    names.add(city.name);
+  }
+
+  for (const [index, road] of data.roads.entries()) {
+    if (!names.has(road?.from) || !names.has(road?.to)) {
+      throw new Error(`Road ${index + 1} refers to a city outside the map.`);
+    }
+
+    if (!Number.isFinite(road.km) || road.km < 0) {
+      throw new Error(`Road ${index + 1} needs a distance of zero or more.`);
+    }
+  }
+}
+
 function drawMap(mapData, path = []) {
   const svg = document.getElementById("map");
   const width = 720;
@@ -39,7 +81,7 @@ function drawMap(mapData, path = []) {
     });
   }
 
-  // نفس مفتاح الطريق سواء اتجهنا من A إلى B أو من B إلى A.
+  // نفس المفتاح للطريق بالاتجاهين.
   const roadKey = (from, to) => JSON.stringify([from, to].sort());
   const routeRoads = new Set();
   const routeCities = new Set(path);
@@ -101,6 +143,9 @@ async function initRouteSearch() {
   const goalSelect = document.getElementById("goal");
   const algorithmSelect = document.getElementById("algo");
   const runButton = document.getElementById("run");
+  const compareButton = document.getElementById("compare");
+  const comparisonTemplate = document.getElementById("comparison-template");
+  const fileInput = document.getElementById("file");
   const results = document.getElementById("results");
   const message = document.getElementById("msg");
 
@@ -112,45 +157,53 @@ async function initRouteSearch() {
     astar: { label: "A* Search", search: astar }
   };
 
-  runButton.disabled = true;
-  results.setAttribute("aria-live", "polite");
-
   let mapData;
   let graph;
+  let latestUpload = 0;
 
-  try {
-    const response = await fetch("./sample-map.json");
-
-    if (!response.ok) {
-      throw new Error(`Unable to open sample-map.json (HTTP ${response.status}).`);
-    }
-
-    mapData = await response.json();
-    graph = buildGraph(mapData);
-    drawMap(mapData);
-  } catch (error) {
-    message.textContent = `Could not load the map. ${error.message}`;
-    message.classList.add("error");
-    return;
-  }
-
-  const cityNames = [...graph.cities.keys()].sort((a, b) =>
-    a.localeCompare(b, "en")
-  );
-
-  for (const select of [startSelect, goalSelect]) {
-    select.replaceChildren(...cityNames.map(name => new Option(name, name)));
-  }
+  runButton.disabled = true;
+  compareButton.disabled = true;
+  fileInput.disabled = true;
+  results.setAttribute("aria-live", "polite");
 
   algorithmSelect.replaceChildren(
     ...Object.entries(algorithms).map(([id, algorithm]) =>
       new Option(algorithm.label, id)
     )
   );
-
-  startSelect.value = "Jenin";
-  goalSelect.value = "Hebron";
   algorithmSelect.value = "astar";
+
+  // نستخدم نفس الخطوات للخريطة الافتراضية وأي خريطة جديدة.
+  function installMap(nextMap, preferredStart, preferredGoal) {
+    validateMapData(nextMap);
+    const nextGraph = buildGraph(nextMap);
+
+    const names = [...nextGraph.cities.keys()].sort((a, b) =>
+      a.localeCompare(b, "en")
+    );
+
+    drawMap(nextMap);
+
+    for (const select of [startSelect, goalSelect]) {
+      const options = document.createDocumentFragment();
+
+      for (const name of names) {
+        options.append(new Option(name, name));
+      }
+
+      select.replaceChildren(options);
+    }
+
+    startSelect.value = names.includes(preferredStart) ? preferredStart : names[0];
+    goalSelect.value = names.includes(preferredGoal)
+      ? preferredGoal
+      : names[names.length - 1];
+
+    mapData = nextMap;
+    graph = nextGraph;
+    runButton.disabled = false;
+    compareButton.disabled = false;
+  }
 
   runButton.addEventListener("click", () => {
     const algorithm = algorithms[algorithmSelect.value];
@@ -175,14 +228,100 @@ async function initRouteSearch() {
     }));
   });
 
+  compareButton.addEventListener("click", () => {
+    const start = startSelect.value;
+    const goal = goalSelect.value;
+
+    const comparisons = Object.values(algorithms).map(({ label, search }) => ({
+      label,
+      ...search(graph, start, goal)
+    }));
+
+    const costs = comparisons.map(result => result.costKm).filter(Number.isFinite);
+    const minCost = costs.length > 0 ? Math.min(...costs) : null;
+
+    const tableContent = comparisonTemplate.content.cloneNode(true);
+    tableContent.querySelector("caption").textContent =
+      `Comparing routes: ${start} → ${goal}`;
+
+    const tbody = tableContent.querySelector("tbody");
+
+    for (const { label, path, costKm, steps } of comparisons) {
+      const hasCost = Number.isFinite(costKm);
+      let isOptimal = false;
+
+      if (hasCost && minCost !== null) {
+        const tolerance = 32 * Number.EPSILON * Math.max(costKm, minCost);
+        isOptimal = Math.abs(costKm - minCost) <= tolerance;
+      }
+
+      const row = tbody.insertRow();
+      row.classList.toggle("optimal-row", isOptimal);
+
+      const cells = [
+        label,
+        path.length > 0 ? path.join(" → ") : "No route found",
+        hasCost ? `${costKm} km` : "—",
+        steps,
+        isOptimal ? "Optimal" : "—"
+      ];
+
+      for (const value of cells) {
+        row.insertCell().textContent = String(value);
+      }
+    }
+
+    results.replaceChildren(tableContent);
+    drawMap(mapData);
+  });
+
   for (const select of [startSelect, goalSelect, algorithmSelect]) {
     select.addEventListener("change", () => {
+      if (!mapData) return;
       results.replaceChildren();
       drawMap(mapData);
     });
   }
 
-  runButton.disabled = false;
+  fileInput.addEventListener("change", async () => {
+    const file = fileInput.files[0];
+    if (!file) return;
+
+    const uploadId = ++latestUpload;
+    fileInput.value = "";
+
+    try {
+      const text = await file.text();
+      if (uploadId !== latestUpload) return;
+
+      installMap(JSON.parse(text));
+      results.replaceChildren();
+      message.textContent = "";
+      message.classList.remove("error");
+    } catch (error) {
+      if (uploadId !== latestUpload) return;
+
+      message.textContent = error instanceof SyntaxError
+        ? "Invalid JSON. Check the commas, quotes, and brackets in your file."
+        : error.message;
+      message.classList.add("error");
+    }
+  });
+
+  try {
+    const response = await fetch("./sample-map.json");
+
+    if (!response.ok) {
+      throw new Error(`Unable to open sample-map.json (HTTP ${response.status}).`);
+    }
+
+    installMap(await response.json(), "Jenin", "Hebron");
+  } catch (error) {
+    message.textContent = `Could not load the default map. ${error.message}`;
+    message.classList.add("error");
+  } finally {
+    fileInput.disabled = false;
+  }
 }
 
 initRouteSearch();

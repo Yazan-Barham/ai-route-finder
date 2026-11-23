@@ -642,3 +642,38 @@ label[for="file"]:focus-visible {
     gap: 4px;
   }
 }
+#compare {
+  margin-top: 10px;
+  justify-content: center;
+  background: var(--green-light);
+  color: var(--green);
+  border: 1px solid var(--line);
+}
+
+#compare:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.comparison-scroll {
+  overflow-x: auto;
+}
+
+.comparison-scroll table {
+  min-width: 520px;
+}
+
+.comparison-scroll caption {
+  margin-bottom: 8px;
+  text-align: left;
+  font-weight: 700;
+}
+
+#results .optimal-row td {
+  background: var(--green-light);
+  color: var(--green);
+}
+
+#results .optimal-row td:last-child {
+  font-weight: 700;
+}

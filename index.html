@@ -66,6 +66,9 @@
             <span>Find route</span>
             <span aria-hidden="true">→</span>
           </button>
+          <button id="compare" class="button" type="button" disabled>
+  Compare all
+</button>
 
           <p class="control-note">
             Pick a starting point, destination, and search strategy.
@@ -140,6 +143,24 @@
   <script src="map-data.js"></script>
   <script src="graph.js"></script>
   <script src="algorithms.js"></script>
+  <template id="comparison-template">
+  <div class="comparison-scroll" tabindex="0" role="region"
+       aria-label="Algorithm comparison">
+    <table>
+      <caption>Algorithm comparison</caption>
+      <thead>
+        <tr>
+          <th scope="col">Algorithm</th>
+          <th scope="col">Route</th>
+          <th scope="col">Cost</th>
+          <th scope="col">Steps</th>
+          <th scope="col">Result</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</template>
   <script src="ui.js"></script>
 </body>
 </html>
