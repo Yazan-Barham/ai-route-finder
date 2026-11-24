@@ -173,7 +173,6 @@ async function initRouteSearch() {
   );
   algorithmSelect.value = "astar";
 
-  // نستخدم نفس الخطوات للخريطة الافتراضية وأي خريطة جديدة.
   function installMap(nextMap, preferredStart, preferredGoal) {
     validateMapData(nextMap);
     const nextGraph = buildGraph(nextMap);
